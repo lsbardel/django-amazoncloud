@@ -1,5 +1,5 @@
-
-from amazoncloud.models import AwsAccount, AMI, rddict, ec2
+from dateutil.parser import parse as parseDate
+from amazoncloud.models import AwsAccount, AMI, Instance, rddict, ec2
 
 
 def rdinv():
@@ -8,21 +8,6 @@ def rdinv():
         d[v] = k
     return d
 
-#id               = models.CharField(primary_key = True, max_length = 255)
-#    name             = models.CharField(max_length = 255)
-#    root_device_type = models.PositiveIntegerField(choices = rdtypes,
-#                                                   verbose_name = 'Root Device Type')
-#    location         = models.CharField(max_length = 255)
-#    root_device_name = models.CharField(max_length = 255)
-#    account          = models.ForeignKey(AwsAccount, null = True, blank = True)
-#    owner_id         = models.CharField(max_length = 255)
-#    platform         = models.CharField(max_length = 255)
-#    architecture     = models.CharField(max_length = 255)
-#    is_public        = models.BooleanField(default = False)
-#    kernel_id        = models.CharField(max_length = 255)
-#    region           = models.CharField(max_length = 64)
-#    snapshot_id      = models.CharField(max_length = 64)
-#    size             = models.FloatField(default = 0)
     
 def updateAmi(all = False):
     rd = rdinv()
@@ -76,6 +61,10 @@ def updateAmi(all = False):
             image.kernel_id = ami.kernel_id or ''
             image.snapshot_id = snapshot_id
             image.size = size
+            if acc:
+                image.our = True
+            else:
+                image.our = False
             image.save()
             images.append(image.id)
             if created:
@@ -90,3 +79,29 @@ def updateAmi(all = False):
     re.delete()
     return added,removed
 
+
+def updateInstances():
+    instances = []
+    for account in AwsAccount.objects.all():
+        c = ec2(account)
+        reservations = c.get_all_instances()
+        for res in reservations:
+            for inst in res.instances:
+                ami   = AMI.objects.get(id = inst.image_id)
+                dt    = parseDate(inst.launch_time)
+                ain, created = Instance.objects.get_or_create(id = inst.id,
+                                                              ami = ami,
+                                                              timestamp = dt)
+                ain.state = inst.state
+                ain.type  = inst.instance_type
+                ain.private_dns_name = inst.private_dns_name
+                ain.public_dns_name = inst.public_dns_name
+                ain.ip_address = inst.ip_address or ''
+                ain.monitored  = inst.monitored
+                ain.save()
+                instances.append(ain.id)
+    
+    re = Instance.objects.exclude(pk__in=instances)
+    re.delete()
+        
+        

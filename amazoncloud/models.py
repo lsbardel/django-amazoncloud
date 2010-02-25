@@ -62,7 +62,12 @@ class AMI(models.Model):
     region           = models.CharField(max_length = 64)
     snapshot_id      = models.CharField(max_length = 64)
     size             = models.FloatField(default = 0)
+    our              = models.BooleanField()
     
+    class Meta:
+        verbose_name = 'AMI'
+        verbose_name_plural = 'AMIs'
+        
     def __unicode__(self):
         return u'Image: %s' % self.id
     
@@ -70,8 +75,9 @@ class AMI(models.Model):
         '''
         Return a boto Image object coreespoinding to the model instance
         '''
-        c           = ec2(self.account)
-        return c.get_image(self.id)
+        if self.account:
+            c = ec2(self.account)
+            return c.get_image(self.id)
     
     def run(self):
         image       = self.image()
@@ -83,13 +89,33 @@ class AMI(models.Model):
         else:
             return self.owner_id
         
-    def our(self):
-        return self.account is not None
+    #def our(self):
+    #    return self.account is not None
+    #our.boolean = True
     
     
-class Instances(models.Model):
-    id               = models.CharField(primary_key = True, max_length = 255)
-    ami              = models.ForeignKey(AMI)
+class Instance(models.Model):
+    id     = models.CharField(primary_key = True, max_length = 255)
+    ami    = models.ForeignKey(AMI)
+    state  = models.CharField(max_length = 255)
+    timestamp = models.DateTimeField()
+    type   = models.CharField(max_length = 255)
+    private_dns_name = models.CharField(max_length = 500)
+    public_dns_name = models.CharField(max_length = 500)
+    ip_address = models.CharField(max_length = 32)
+    monitored = models.BooleanField()
+    
+    def __unicode__(self):
+        return u'Instance: %s' % self.id
+    
+    def image(self):
+        '''
+        Return a boto Image object coreespoinding to the model instance
+        '''
+        account = self.ami.account
+        if account:
+            c  = ec2(self.account)
+            return c.get_instance(self.id)
     
     
     

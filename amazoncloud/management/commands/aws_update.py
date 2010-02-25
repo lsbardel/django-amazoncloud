@@ -13,6 +13,7 @@ class Command(BaseCommand):
     can_import_settings = True
 
     def handle(self, *args, **options):
-        from amazoncloud import utils
+        from amazoncloud.core import utils
         added, removed = utils.updateAmi(all = True)
         print("added {0}, removed {1}".format(added,removed))
+        utils.updateInstances()
