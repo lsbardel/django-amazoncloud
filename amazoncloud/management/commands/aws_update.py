@@ -14,4 +14,5 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         from amazoncloud import utils
-        utils.updateAmi()
+        added, removed = utils.updateAmi(all = True)
+        print("added {0}, removed {1}".format(added,removed))

@@ -28,10 +28,11 @@ class AwsAccount(models.Model):
     '''
     Amazon Web Service Account
     '''
-    account_number = models.PositiveIntegerField(primary_key = True)
+    account_number = models.CharField(max_length = 255, primary_key = True)
     access_key     = models.CharField(max_length = 255)
     secret_key     = models.CharField(max_length = 255)
-    prefix         = models.CharField(max_length = 255)
+    prefix         = models.CharField(max_length = 255,
+                                      help_text = 'This is used as a prefix when creating S3 buckets')
     
     def __unicode__(self):
         return u'%s' % self.account_number
@@ -42,18 +43,25 @@ class AwsAccount(models.Model):
 
 class AMI(models.Model):
     '''
-    Amazon Machine Image
-    It is own by one account
+    Amazon Machine Image - slightly denormalized
     '''
     id               = models.CharField(primary_key = True, max_length = 255)
+    timestamp        = models.DateTimeField(auto_now_add = True)
     name             = models.CharField(max_length = 255)
+    description      = models.TextField()
     root_device_type = models.PositiveIntegerField(choices = rdtypes,
                                                    verbose_name = 'Root Device Type')
+    location         = models.CharField(max_length = 255)
     root_device_name = models.CharField(max_length = 255)
-    account          = models.ForeignKey(AwsAccount)
+    account          = models.ForeignKey(AwsAccount, null = True, blank = True)
+    owner_id         = models.CharField(max_length = 255)
     platform         = models.CharField(max_length = 255)
     architecture     = models.CharField(max_length = 255)
     is_public        = models.BooleanField(default = False)
+    kernel_id        = models.CharField(max_length = 255)
+    region           = models.CharField(max_length = 64)
+    snapshot_id      = models.CharField(max_length = 64)
+    size             = models.FloatField(default = 0)
     
     def __unicode__(self):
         return u'Image: %s' % self.id
@@ -68,6 +76,15 @@ class AMI(models.Model):
     def run(self):
         image       = self.image()
         reservation = self
+        
+    def accno(self):
+        if self.account:
+            return self.account
+        else:
+            return self.owner_id
+        
+    def our(self):
+        return self.account is not None
     
     
 class Instances(models.Model):
