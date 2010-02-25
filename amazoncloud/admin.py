@@ -15,6 +15,12 @@ def launch_instance(modeladmin, request, queryset):
         messages.error(request, "Select on image at a time when launching new instances.")
 launch_instance.short_description = "Launch new instance"
 
+def deregister_images(modeladmin, request, queryset):
+    for obj in queryset:
+        c = obj.ec2()
+        if c.deregister_image(obj.id):
+            self.message_user(request, 'deregistered image {0}'.format(obj))
+
 def instance_command(command, queryset):
     for obj in queryset:
         c = obj.ec2()
@@ -34,34 +40,52 @@ def reboot_instances(modeladmin, request, queryset):
 
 def stop_instances(modeladmin, request, queryset):
     instance_command('stop_instances',queryset)
+    
+
+def create_key_pair(modeladmin, request, queryset):
+    if queryset.count() == 1:
+        acc = queryset[0]
+        url = '{0}amazoncloud/keypair/add/?account={1}'.format(settings.ADMIN_URL_PREFIX,acc.pk)
+        return http.HttpResponseRedirect(url)
+    else:
+        messages.error(request, "Select one account at a time when creating keypairs.")
 
 
-class AMIAdmin(admin.ModelAdmin):
+
+class EC2Admin(admin.ModelAdmin):
+    
+    def has_change_permission(self, request, obj=None):
+        if obj:
+            return False
+        else:
+            return True
+    
+    def get_actions(self, request):
+        actions = super(InstanceAdmin, self).get_actions(request)
+        del actions['delete_selected']
+        return actions
+    
+
+class AwsAccountAdmin(admin.ModelAdmin):
+    list_display=['account_number','prefix','access_key']
+    
+    actions = [create_key_pair]
+    
+
+class AMIAdmin(EC2Admin):
     list_display = ('id','name','region','size','root_device_type','accno','our','is_public','platform','architecture','timestamp')
     list_filter = ('is_public', 'root_device_type', 'architecture', 'region', 'our')
     search_fields  = ('name', 'description', 'architecture')
     
-    actions = [launch_instance]
-    
-    def has_change_permission(self, request, obj=None):
-        if obj:
-            return False
-        else:
-            return True
+    actions = [launch_instance,deregister_images]
 
     
-class InstanceAdmin(admin.ModelAdmin):
+class InstanceAdmin(EC2Admin):
     list_display = ('id','account','ami','root','state','timestamp','type','region','public_dns_name',
                     'ip_address','key_pair','security','monitored')
     form = forms.InstanceForm
     actions = [terminate_instances, reboot_instances, stop_instances]
-    
-    def has_change_permission(self, request, obj=None):
-        if obj:
-            return False
-        else:
-            return True
-        
+            
     def save_model(self, request, obj, form, change):
         if change:
             return obj
@@ -73,14 +97,10 @@ class InstanceAdmin(admin.ModelAdmin):
                               monitoring_enabled=obj.monitored)
         utils.updateReservation(res)
         
-    def get_actions(self, request):
-        actions = super(InstanceAdmin, self).get_actions(request)
-        del actions['delete_selected']
-        return actions
-        
     
     
 admin.site.register(models.AMI, AMIAdmin)
 admin.site.register(models.Instance, InstanceAdmin)
-admin.site.register(models.AwsAccount, list_display=['account_number','access_key','secret_key','prefix'])
+admin.site.register(models.AwsAccount, AwsAccountAdmin)
 admin.site.register(models.SecurityGroup, list_display=['account','name'])
+admin.site.register(models.KeyPair, list_display=['account','name','fingerprint'])

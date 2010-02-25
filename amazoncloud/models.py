@@ -56,7 +56,7 @@ class SecurityGroup(models.Model):
         
 class KeyPair(models.Model):
     name    = models.CharField(max_length = 255)
-    fingerprint  = models.CharField(max_length = 255)
+    fingerprint  = models.CharField(max_length = 255, editable = False)
     account = models.ForeignKey(AwsAccount, related_name = 'keypairs')
     
     def __unicode__(self):
@@ -164,6 +164,7 @@ class Instance(EC2base):
     def security(self):
         return ', '.join(self.sgroup())
     security.short_description = 'security groups'
+    
         
         
     
