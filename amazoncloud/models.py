@@ -23,6 +23,10 @@ rdtypes = ((0, 'unknown'),
            )
 rddict = dict(rdtypes)
 
+instype = (('m1.small','m1.small (1.7 GB)'),
+           ('c1.medium','c1.medium')
+           )
+
 
 class AwsAccount(models.Model):
     '''
@@ -35,18 +39,49 @@ class AwsAccount(models.Model):
                                       help_text = 'This is used as a prefix when creating S3 buckets')
     
     def __unicode__(self):
-        return u'%s' % self.account_number
+        return u'{0}: {1}'.format(self.prefix,self.account_number)
     
     def spot_price_bucket(self, bucket_name = 'spot-price-bucket'):
         return get_or_create_bucket(s3(self),('%s-%s' % (self.prefix,bucket_name)).lower())
+    
+class SecurityGroup(models.Model):
+    name    = models.CharField(max_length = 255)
+    account = models.ForeignKey(AwsAccount, related_name = 'security_groups')
+    
+    def __unicode__(self):
+        return u'{0}'.format(self.name)
+    
+    class Meta:
+        unique_together = ('name','account')
+        
+class KeyPair(models.Model):
+    name    = models.CharField(max_length = 255)
+    fingerprint  = models.CharField(max_length = 255)
+    account = models.ForeignKey(AwsAccount, related_name = 'keypairs')
+    
+    def __unicode__(self):
+        return u'{0}'.format(self.name)
+    
+    class Meta:
+        unique_together = ('name','account')
 
 
-class AMI(models.Model):
+
+class EC2base(models.Model):
+    id      = models.CharField(primary_key = True, max_length = 255, editable = False)
+    
+    class Meta:
+        abstract = True
+        
+    def ec2(self):
+        return ec2(self.account)
+
+
+class AMI(EC2base):
     '''
     Amazon Machine Image - slightly denormalized
     '''
-    id               = models.CharField(primary_key = True, max_length = 255)
-    timestamp        = models.DateTimeField(auto_now_add = True)
+    timestamp        = models.DateTimeField(auto_now_add = True, editable = False)
     name             = models.CharField(max_length = 255)
     description      = models.TextField()
     root_device_type = models.PositiveIntegerField(choices = rdtypes,
@@ -94,28 +129,43 @@ class AMI(models.Model):
     #our.boolean = True
     
     
-class Instance(models.Model):
-    id     = models.CharField(primary_key = True, max_length = 255)
-    ami    = models.ForeignKey(AMI)
-    state  = models.CharField(max_length = 255)
-    timestamp = models.DateTimeField()
-    type   = models.CharField(max_length = 255)
-    private_dns_name = models.CharField(max_length = 500)
-    public_dns_name = models.CharField(max_length = 500)
-    ip_address = models.CharField(max_length = 32)
-    monitored = models.BooleanField()
+class Instance(EC2base):
+    account = models.ForeignKey(AwsAccount)
+    ami     = models.ForeignKey(AMI)
+    state   = models.CharField(max_length = 255, editable = False)
+    timestamp = models.DateTimeField(editable = False, null = True)
+    type   = models.CharField(choices = instype, max_length = 255)
+    private_dns_name = models.CharField(max_length = 500, editable = False, blank = True)
+    public_dns_name = models.CharField(max_length = 500, editable = False, blank = True)
+    ip_address = models.CharField(max_length = 32, blank = True)
+    monitored = models.BooleanField(default = False)
+    region    = models.CharField(max_length = 255, blank = True)
+    key_pair  = models.ForeignKey(KeyPair)
+    security_groups = models.ManyToManyField(SecurityGroup, null = True)
     
     def __unicode__(self):
         return u'Instance: %s' % self.id
     
-    def image(self):
+    def instance(self):
         '''
-        Return a boto Image object coreespoinding to the model instance
+        Return a boto Image object correspoinding to the model instance
         '''
         account = self.ami.account
         if account:
             c  = ec2(self.account)
             return c.get_instance(self.id)
+    
+    def root(self):
+        return rddict.get(self.ami.root_device_type)
+    
+    def sgroup(self):
+        return [s.name for s in self.security_groups.all()]
+    
+    def security(self):
+        return ', '.join(self.sgroup())
+    security.short_description = 'security groups'
+        
+        
     
     
     

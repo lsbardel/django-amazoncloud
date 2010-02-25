@@ -14,6 +14,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         from amazoncloud.core import utils
-        added, removed = utils.updateAmi(all = True)
-        print("added {0}, removed {1}".format(added,removed))
+        #aws = utils.AWS()
+        #added, removed = aws(all = True)
+        #print("added {0}, removed {1}".format(added,removed))
         utils.updateInstances()
