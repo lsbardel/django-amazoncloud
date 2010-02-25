@@ -1,7 +1,8 @@
 Django Amazon Cloud
 ======================
 
-Very simple but complete Amazon Web Service admin in django
+Very simple Amazon Web Service admin in django.
+Very much under development, not ready yet.
 
 
 Installation
