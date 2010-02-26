@@ -43,8 +43,17 @@ class AwsAccount(models.Model):
     
     def spot_price_bucket(self, bucket_name = 'spot-price-bucket'):
         return get_or_create_bucket(s3(self),('%s-%s' % (self.prefix,bucket_name)).lower())
+
+
+class EC2base(models.Model):    
+    class Meta:
+        abstract = True
+        
+    def ec2(self):
+        return ec2(self.account)
+
     
-class SecurityGroup(models.Model):
+class SecurityGroup(EC2base):
     name    = models.CharField(max_length = 255)
     account = models.ForeignKey(AwsAccount, related_name = 'security_groups')
     
@@ -54,10 +63,11 @@ class SecurityGroup(models.Model):
     class Meta:
         unique_together = ('name','account')
         
-class KeyPair(models.Model):
+class KeyPair(EC2base):
     name    = models.CharField(max_length = 255)
     fingerprint  = models.CharField(max_length = 255, editable = False)
     account = models.ForeignKey(AwsAccount, related_name = 'keypairs')
+    material = models.TextField(blank = True)
     
     def __unicode__(self):
         return u'{0}'.format(self.name)
@@ -67,20 +77,11 @@ class KeyPair(models.Model):
 
 
 
-class EC2base(models.Model):
-    id      = models.CharField(primary_key = True, max_length = 255, editable = False)
-    
-    class Meta:
-        abstract = True
-        
-    def ec2(self):
-        return ec2(self.account)
-
-
 class AMI(EC2base):
     '''
     Amazon Machine Image - slightly denormalized
     '''
+    id               = models.CharField(primary_key = True, max_length = 255, editable = False)
     timestamp        = models.DateTimeField(auto_now_add = True, editable = False)
     name             = models.CharField(max_length = 255)
     description      = models.TextField()
@@ -130,6 +131,7 @@ class AMI(EC2base):
     
     
 class Instance(EC2base):
+    id      = models.CharField(primary_key = True, max_length = 255, editable = False)
     account = models.ForeignKey(AwsAccount)
     ami     = models.ForeignKey(AMI)
     state   = models.CharField(max_length = 255, editable = False)

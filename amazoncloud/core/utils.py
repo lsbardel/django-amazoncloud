@@ -14,6 +14,10 @@ class AWS(object):
     def __init__(self):
         self.rd = rdinv()
         
+    def sync_accounts(self):
+        for account in AwsAccount.objects.all():
+            c = self.__updategroups(account)
+        
     def update(self, ami, acc = None):
         if ami.region:
             region = ami.region.name or ''
@@ -57,7 +61,7 @@ class AWS(object):
         image.save()
         return image, created
     
-    def updategroups(self, account):
+    def __updategroups(self, account):
         c = ec2(account)
         groups = c.get_all_security_groups()
         gs = []
@@ -74,6 +78,7 @@ class AWS(object):
         for group in groups:
             g,created = KeyPair.objects.get_or_create(name = group.name,
                                                       fingerprint = group.fingerprint,
+                                                      material = group.material or '',
                                                       account = account)
             gs.append(g.id)
         KeyPair.objects.exclude(pk__in=gs).delete()
@@ -84,7 +89,7 @@ class AWS(object):
         added  = 0
         images = []
         for account in AwsAccount.objects.all():
-            c = self.updategroups(account)            
+            c = self.__updategroups(account)
             amis = c.get_all_images(owners = [account.account_number])
             for ami in amis:
                 image, created = self.update(ami,account)
