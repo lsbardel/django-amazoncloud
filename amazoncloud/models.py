@@ -1,5 +1,6 @@
 
 from django.db import models
+from django.utils.translation import ugettext_lazy as _
 
 
 def s3(account):
@@ -23,8 +24,11 @@ rdtypes = ((0, 'unknown'),
            )
 rddict = dict(rdtypes)
 
-instype = (('m1.small','m1.small (1.7 GB)'),
-           ('c1.medium','c1.medium')
+archtype = (('i386','i386'),
+            ('x86_64','x86_64')
+            )
+instype = (('m1.small','Sm1.small (1.7 GB)'),
+           ('c1.medium','c1.medium (7.5 GB)')
            )
 
 
@@ -92,7 +96,7 @@ class AMI(EC2base):
     account          = models.ForeignKey(AwsAccount, null = True, blank = True)
     owner_id         = models.CharField(max_length = 255)
     platform         = models.CharField(max_length = 255)
-    architecture     = models.CharField(max_length = 255)
+    architecture     = models.CharField(choices = archtype, max_length = 255)
     is_public        = models.BooleanField(default = False)
     kernel_id        = models.CharField(max_length = 255)
     region           = models.CharField(max_length = 64)
@@ -107,7 +111,7 @@ class AMI(EC2base):
     def __unicode__(self):
         return u'Image: %s' % self.id
     
-    def image(self):
+    def boto(self):
         '''
         Return a boto Image object coreespoinding to the model instance
         '''
@@ -135,8 +139,9 @@ class Instance(EC2base):
     account = models.ForeignKey(AwsAccount)
     ami     = models.ForeignKey(AMI)
     state   = models.CharField(max_length = 255, editable = False)
-    timestamp = models.DateTimeField(editable = False, null = True)
+    timestamp = models.DateTimeField(editable = False, null = True, verbose_name = _('started'))
     type   = models.CharField(choices = instype, max_length = 255)
+    size    = models.PositiveIntegerField(default = 0)
     private_dns_name = models.CharField(max_length = 500, editable = False, blank = True)
     public_dns_name = models.CharField(max_length = 500, editable = False, blank = True)
     ip_address = models.CharField(max_length = 32, blank = True)
@@ -152,10 +157,12 @@ class Instance(EC2base):
         '''
         Return a boto Image object correspoinding to the model instance
         '''
-        account = self.ami.account
-        if account:
-            c  = ec2(self.account)
-            return c.get_instance(self.id)
+        c = self.ec2()
+        re = c.get_all_instances([self.id])
+        try:
+            return re[0].instances[0]
+        except:
+            return None
     
     def root(self):
         return rddict.get(self.ami.root_device_type)

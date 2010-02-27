@@ -1,6 +1,7 @@
 from dateutil.parser import parse as parseDate
 from amazoncloud.models import AwsAccount, AMI, SecurityGroup, KeyPair, Instance, rddict, ec2
 
+SIZE_S3_AMI = 10
 
 def rdinv():
     d = {}
@@ -78,8 +79,9 @@ class AWS(object):
         for group in groups:
             g,created = KeyPair.objects.get_or_create(name = group.name,
                                                       fingerprint = group.fingerprint,
-                                                      material = group.material or '',
                                                       account = account)
+            if group.material:
+                g.material = group.material 
             gs.append(g.id)
         KeyPair.objects.exclude(pk__in=gs).delete()
         return c
@@ -141,6 +143,13 @@ def updateReservation(res):
         ain.public_dns_name = inst.public_dns_name
         ain.ip_address = inst.ip_address or ''
         ain.monitored  = inst.monitored
+        
+        try:
+            ebsblock = inst.block_device_mapping[inst.root_device_name]
+            ain.size = int(ebsblock.size)
+        except:
+            pass
+        
         ain.security_groups.clear()
         for g in groups:
             ain.security_groups.add(g)
