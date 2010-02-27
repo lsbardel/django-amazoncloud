@@ -27,8 +27,9 @@ Requirements
  * python-dateutil for date manipulation
  
  
- Features
- ==============
+Features
+==============
+ 
   * Manage multiple accounts on Amazon Web Services (AWS).
   * Store your AMIs as well as public ones.
   * Manage your instances, start, stop, reboot, terminate.
