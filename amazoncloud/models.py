@@ -1,6 +1,9 @@
-
+import os
+import stat
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
+
+from amazoncloud.core import installers
 
 
 def s3(account):
@@ -30,6 +33,8 @@ archtype = (('i386','i386'),
 instype = (('m1.small','Sm1.small (1.7 GB)'),
            ('c1.medium','c1.medium (7.5 GB)')
            )
+supported_os = (('ubuntu','ubuntu'),
+                )
 
 
 class AwsAccount(models.Model):
@@ -73,12 +78,29 @@ class KeyPair(EC2base):
     account = models.ForeignKey(AwsAccount, related_name = 'keypairs')
     material = models.TextField(blank = True)
     
+    class Meta:
+        unique_together = ('name','account')
+        
     def __unicode__(self):
         return u'{0}'.format(self.name)
     
-    class Meta:
-        unique_together = ('name','account')
-
+    def key_filename(self):
+        from amazoncloud.settings import SSH_KEYS_PATH
+        if SSH_KEYS_PATH and self.material:
+            return os.path.join(SSH_KEYS_PATH,'{0}.pem'.format(self.name)) 
+        
+    def dump(self):
+        '''
+        Dump material into file if available
+        '''
+        path = self.key_filename()
+        if path and self.material:
+            if os.path.isfile(path):
+                os.chmod(path, stat.S_IWUSR)
+            f = open(path,'w')
+            f.write(self.material)
+            f.close()
+            os.chmod(path, stat.S_IRUSR)
 
 
 class AMI(EC2base):
@@ -88,14 +110,14 @@ class AMI(EC2base):
     id               = models.CharField(primary_key = True, max_length = 255, editable = False)
     timestamp        = models.DateTimeField(auto_now_add = True, editable = False)
     name             = models.CharField(max_length = 255)
-    description      = models.TextField()
+    description      = models.TextField(blank = True)
     root_device_type = models.PositiveIntegerField(choices = rdtypes,
                                                    verbose_name = 'Root Device Type')
     location         = models.CharField(max_length = 255)
     root_device_name = models.CharField(max_length = 255)
     account          = models.ForeignKey(AwsAccount, null = True, blank = True)
     owner_id         = models.CharField(max_length = 255)
-    platform         = models.CharField(max_length = 255)
+    platform         = models.CharField(max_length = 255, blank = True)
     architecture     = models.CharField(choices = archtype, max_length = 255)
     is_public        = models.BooleanField(default = False)
     kernel_id        = models.CharField(max_length = 255)
@@ -174,7 +196,17 @@ class Instance(EC2base):
         return ', '.join(self.sgroup())
     security.short_description = 'security groups'
     
-        
+    
+class Installer(models.Model):
+    name     = models.CharField(unique = True, max_length = 255)
+    packages = models.TextField(blank = True)
+    osystem  = models.CharField(choices = supported_os, max_length = 64, verbose_name = 'operative system')
+    
+    def install(self, instance):
+        f = getattr(installers,self.osystem, None)
+        if f:
+            f(instance, self.packages)
+
         
     
     

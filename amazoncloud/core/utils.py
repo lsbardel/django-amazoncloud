@@ -81,7 +81,8 @@ class AWS(object):
                                                       fingerprint = group.fingerprint,
                                                       account = account)
             if group.material:
-                g.material = group.material 
+                g.material = group.material
+            g.dump()
             gs.append(g.id)
         KeyPair.objects.exclude(pk__in=gs).delete()
         return c
