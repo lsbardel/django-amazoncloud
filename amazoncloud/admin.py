@@ -50,24 +50,36 @@ class AMIAdmin(EC2Admin):
                     'is_public','platform','architecture','location','timestamp')
     list_filter = ('is_public', 'root_device_type', 'architecture', 'region', 'our')
     search_fields  = ('name', 'description', 'architecture')
-    
+    form    = forms.CreateImage
     actions = [actions.launch_instance,
                actions.deregister_images]
     
     def add_view(self, request, **kwargs):
         if request.method == 'GET':
             initial = dict(request.GET.items())
-            id = initial.pop('id',None)
-            # The id Could be an image id or an instance id
+            id = initial.get('id',None)
+            # The id is an instance id
             if id:
                 inst = models.Instance.objects.get(id = id)
                 ami  = inst.ami
-                initial['size'] = inst.size()
+                initial['instance'] = id
                 initial['name'] = ami.name
                 initial['description'] = ami.description
             request.GET = initial
         return super(AMIAdmin,self).add_view(request, **kwargs)
-                
+    
+    def save_model(self, request, obj, form, change):
+        if change:
+            return super(AMIAdmin,self).save_model(request, obj, form, change)
+        try:
+            data = form.cleaned_data
+            inst = models.Instance.objects.get(id = data['instance'])
+            c    = inst.ec2()
+            id = c.create_image(inst.id, data['name'], data['description'])
+            if id:
+                self.message_user(request, 'CReated new AMI %s' % id)
+        except Exception, e:
+            messages.error(request,str(e))
 
     
 class InstanceAdmin(EC2Admin):
@@ -79,7 +91,8 @@ class InstanceAdmin(EC2Admin):
                actions.stop_instances,
                actions.create_image,
                actions.monitor_instances,
-               actions.unmonitor_instances]
+               actions.unmonitor_instances,
+               actions.install_packages]
             
     def save_model(self, request, obj, form, change):
         '''
@@ -104,6 +117,21 @@ class InstanceAdmin(EC2Admin):
                               block_device_map = image.block_device_mapping)
         utils.updateReservation(res)
         
+
+class IpAddressAdmin(admin.ModelAdmin):
+    list_display=['account','ip','instance']
+    form = forms.CreateAddress
+    
+    def save_model(self, request, obj, form, change):
+        if change:
+            return obj
+        acc    = form.cleaned_data['account']
+        addr   = acc.allocate_address()
+        obj.ip = addr.public_ip
+        super(IpAddressAdmin,self).save_model(request, obj, form, change)
+        
+    
+    
     
     
 admin.site.register(models.AMI, AMIAdmin)
@@ -112,3 +140,4 @@ admin.site.register(models.AwsAccount, AwsAccountAdmin)
 admin.site.register(models.SecurityGroup, list_display=['account','name'])
 admin.site.register(models.KeyPair,KeyPairAdmin)
 admin.site.register(models.Installer, list_display=['name','osystem'])
+admin.site.register(models.IpAddress, IpAddressAdmin)

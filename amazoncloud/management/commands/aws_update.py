@@ -11,8 +11,11 @@ class Command(BaseCommand):
     can_import_settings = True
 
     def handle(self, *args, **options):
+        '''
+        Updates accounts, security group, keypairs, own images and instances
+        '''
         from amazoncloud.core import utils
-        #aws = utils.AWS()
-        #added, removed = aws(all = True)
-        #print("added {0}, removed {1}".format(added,removed))
+        aws = utils.AWS()
+        aws.sync_accounts()
+        aws(all = False)
         utils.updateInstances()

@@ -20,7 +20,9 @@
 {% else %}
     <p>{% blocktrans %}{{ question }}{% endblocktrans %}</p>
     {% for deleteable_object in deletable_objects %}
-        <ul>{{ deleteable_object|unordered_list }}</ul>
+        <ul>{% for item in deleteable_object %}
+        <li>{{ item|safe }}</li>{% endfor %}
+        </ul>
     {% endfor %}
     <form action="" method="post">{% csrf_token %}
     <div>

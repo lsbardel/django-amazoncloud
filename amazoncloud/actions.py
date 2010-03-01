@@ -1,5 +1,6 @@
 from django import template
 from django import http
+from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import render_to_response
 from django.utils.encoding import force_unicode
@@ -11,6 +12,8 @@ from django.contrib.admin.util import get_deleted_objects, model_ngettext
 from django.utils.translation import ugettext_lazy, ugettext as _
 from django.conf import settings
 
+from amazoncloud.forms import InstallPackagesForm
+
 
 def confirmation(modeladmin, request, queryset, action, question):
     opts = modeladmin.model._meta
@@ -18,13 +21,10 @@ def confirmation(modeladmin, request, queryset, action, question):
     # Check that the user has delete permission for the actual model
     if not modeladmin.has_delete_permission(request):
         raise PermissionDenied
-    deletable_objects = []
-    perms_needed = set()
-    i = 0
-    for obj in queryset:
-        deletable_objects.append([mark_safe(u'%s: <a href="%s/">%s</a>' % (escape(force_unicode(capfirst(opts.verbose_name))), obj.pk, escape(obj))), []])
-        get_deleted_objects(deletable_objects[i], perms_needed, request.user, obj, opts, 1, modeladmin.admin_site, levels_to_root=2)
-        i=i+1
+    
+    # Populate deletable_objects, a data structure of all related objects that
+    # will also be deleted.
+    deletable_objects, perms_needed = get_deleted_objects(queryset, opts, request.user, modeladmin.admin_site, levels_to_root=2)
         
     if request.POST.get('post'):
         if perms_needed:
@@ -88,7 +88,7 @@ def deregister_images(modeladmin, request, queryset):
     for obj in queryset:
         c = obj.ec2()
         if c.deregister_image(obj.id):
-            self.message_user(request, 'deregistered image {0}'.format(obj))
+            modeladmin.message_user(request, 'deregistered image {0}'.format(obj))
 
 #_________________________________________________________ Actions on Instances
 def terminate_instances(modeladmin, request, queryset):
@@ -115,6 +115,52 @@ def create_image(modeladmin, request, queryset):
         return http.HttpResponseRedirect(url)
     else:
         messages.error(request, "Select on instance at a time when creating a new image.")
+        
+def install_packages(modeladmin, request, queryset):
+    opts = modeladmin.model._meta
+    app_label = opts.app_label
+    
+    if request.POST.get('post'):
+        f = InstallPackagesForm(request.POST)
+        if f.is_valid():
+            for installer in f.cleaned_data['packages']:
+                for obj in queryset:
+                    installer.install(obj)
+        return None
+    
+    platform = ''
+    error = False
+    for obj in queryset:
+        objp = obj.ami.platform
+        if not platform:
+            platform = objp
+        if not objp:
+            error = True
+            messages.error(request,"Platform not available for {0}".format(obj))
+        elif objp != platform:
+            error = True
+            messages.error(request,"Wrong platform for {0}".format(obj))
+            
+    f = None
+    if not error:
+        f = InstallPackagesForm(platform = platform)
+    
+    context = {
+               'form': f,
+               'queryset': queryset,
+               'error': error,
+               "object_name": force_unicode(opts.verbose_name),
+                "opts": opts,
+                "root_path": modeladmin.admin_site.root_path,
+                "app_label": app_label,
+                'action_checkbox_name': helpers.ACTION_CHECKBOX_NAME,
+               }
+    return render_to_response("admin/%s/install_packages.html" % app_label,
+                              context,
+                              context_instance=template.RequestContext(request))
+               
+        
+    
     
 #__________________________________________________________ Actions on AwsAccounts
 def create_key_pair(modeladmin, request, queryset):

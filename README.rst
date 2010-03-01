@@ -29,14 +29,28 @@ Requirements
  
 Features
 ==============
- 
- * Manage multiple accounts on Amazon Web Services (AWS).
- * Store your AMIs as well as public ones.
- * Manage your instances, start, stop, reboot, terminate.
- * Create an AMI from a running instance.
+
+Multiple Accounts
+------------------- 
+You can setup multiple AWS accounts and manage them together.
+
+AMI
+------------------
+The application stores your account's private AMI as well as public AMI
+
+Instances
+---------------
+ * Full management of your instances: start, stop, reboot, terminate.
+ * You can also create a new AMI from a running instance, implemented as an action in the Instances list.
+ * **Image Resizing** If the type of instance is mounted on EBS, you can specify a different image size. in this way you can create new EBS images of different sizes.
+
+Security
+-----------
  * KeyPair and Security Group management.
- * And much more...
+
 
 Todo
 ============
- * S3 
+ * S3
+ 
+

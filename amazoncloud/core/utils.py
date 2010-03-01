@@ -1,5 +1,5 @@
 from dateutil.parser import parse as parseDate
-from amazoncloud.models import AwsAccount, AMI, SecurityGroup, KeyPair, Instance, rddict, ec2
+from amazoncloud.models import AwsAccount, IpAddress, AMI, SecurityGroup, KeyPair, Instance, rddict, ec2
 
 SIZE_S3_AMI = 10
 
@@ -85,6 +85,7 @@ class AWS(object):
             g.dump()
             gs.append(g.id)
         KeyPair.objects.exclude(pk__in=gs).delete()
+        
         return c
         
     def __call__(self, all = True):
@@ -147,7 +148,8 @@ def updateReservation(res):
         
         try:
             ebsblock = inst.block_device_mapping[inst.root_device_name]
-            ain.size = int(ebsblock.size)
+            if ebsblock.size:
+                ain.size = int(ebsblock.size)
         except:
             pass
         
@@ -161,10 +163,23 @@ def updateReservation(res):
 
 def updateInstances():
     instances = []
+    gs = []
     for account in AwsAccount.objects.all():
         c = ec2(account)
         reservations = c.get_all_instances()
         for res in reservations:
-            instances.extend(updateReservation(res))    
+            instances.extend(updateReservation(res))
+        #
+        # Elastic IPs
+        allips = c.get_all_addresses()
+        for ip in allips:
+            g,created = IpAddress.objects.get_or_create(account = account,
+                                                        ip = ip.public_ip)
+            if ip.instance_id:
+                g.instance = Instance.objects.get(id = ip.instance_id)
+            g.save()
+            gs.append(g.id)
+    
+    IpAddress.objects.exclude(pk__in=gs).delete()  
     re = Instance.objects.exclude(pk__in=instances)
     re.delete()        

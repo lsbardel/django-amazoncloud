@@ -34,6 +34,7 @@ instype = (('m1.small','Sm1.small (1.7 GB)'),
            ('c1.medium','c1.medium (7.5 GB)')
            )
 supported_os = (('ubuntu','ubuntu'),
+                ('windows','windows'),
                 )
 
 
@@ -52,6 +53,15 @@ class AwsAccount(models.Model):
     
     def spot_price_bucket(self, bucket_name = 'spot-price-bucket'):
         return get_or_create_bucket(s3(self),('%s-%s' % (self.prefix,bucket_name)).lower())
+    
+    def ec2(self):
+        return ec2(self)
+    
+    def allocate_address(self):
+        '''
+        Allocate new IP address
+        '''
+        return self.ec2().allocate_address()
 
 
 class EC2base(models.Model):    
@@ -117,13 +127,13 @@ class AMI(EC2base):
     root_device_name = models.CharField(max_length = 255)
     account          = models.ForeignKey(AwsAccount, null = True, blank = True)
     owner_id         = models.CharField(max_length = 255)
-    platform         = models.CharField(max_length = 255, blank = True)
+    platform         = models.CharField(choices = supported_os, max_length = 255, blank = True)
     architecture     = models.CharField(choices = archtype, max_length = 255)
     is_public        = models.BooleanField(default = False)
     kernel_id        = models.CharField(max_length = 255)
     region           = models.CharField(max_length = 64)
     snapshot_id      = models.CharField(max_length = 64)
-    size             = models.FloatField(default = 0)
+    size             = models.PositiveIntegerField(default = 0)
     our              = models.BooleanField()
     
     class Meta:
@@ -196,11 +206,20 @@ class Instance(EC2base):
         return ', '.join(self.sgroup())
     security.short_description = 'security groups'
     
+
+class IpAddress(EC2base):
+    account = models.ForeignKey(AwsAccount)
+    ip = models.IPAddressField(unique = True)
+    instance = models.ForeignKey(Instance, null = True)    
+
     
 class Installer(models.Model):
     name     = models.CharField(unique = True, max_length = 255)
     packages = models.TextField(blank = True)
     osystem  = models.CharField(choices = supported_os, max_length = 64, verbose_name = 'operative system')
+    
+    def __unicode__(self):
+        return u'%s' % self.name
     
     def install(self, instance):
         f = getattr(installers,self.osystem, None)
