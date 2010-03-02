@@ -43,14 +43,14 @@ class AwsAccount(models.Model):
     '''
     Amazon Web Service Account
     '''
-    account_number = models.CharField(max_length = 255, primary_key = True)
-    access_key     = models.CharField(max_length = 255)
-    secret_key     = models.CharField(max_length = 255)
-    prefix         = models.CharField(max_length = 255,
+    id           = models.CharField(max_length = 255, primary_key = True)
+    access_key   = models.CharField(max_length = 255)
+    secret_key   = models.CharField(max_length = 255)
+    prefix       = models.CharField(max_length = 255,
                                       help_text = 'This is used as a prefix when creating S3 buckets')
     
     def __unicode__(self):
-        return u'{0}: {1}'.format(self.prefix,self.account_number)
+        return u'{0}: {1}'.format(self.prefix,self.id)
     
     def spot_price_bucket(self, bucket_name = 'spot-price-bucket'):
         return get_or_create_bucket(s3(self),('%s-%s' % (self.prefix,bucket_name)).lower())
@@ -84,10 +84,10 @@ class SecurityGroup(EC2base):
         unique_together = ('name','account')
         
 class KeyPair(EC2base):
-    name    = models.CharField(max_length = 255)
+    name         = models.CharField(max_length = 255)
     fingerprint  = models.CharField(max_length = 255, editable = False)
-    account = models.ForeignKey(AwsAccount, related_name = 'keypairs')
-    material = models.TextField(blank = True)
+    account      = models.ForeignKey(AwsAccount, related_name = 'keypairs')
+    material     = models.TextField(blank = True)
     
     class Meta:
         unique_together = ('name','account')

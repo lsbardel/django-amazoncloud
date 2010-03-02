@@ -24,7 +24,7 @@ class EC2Admin(admin.ModelAdmin):
     
 
 class AwsAccountAdmin(admin.ModelAdmin):
-    list_display=['account_number','prefix','access_key']
+    list_display=['id','prefix','access_key']
     
     actions = [actions.create_key_pair]
     

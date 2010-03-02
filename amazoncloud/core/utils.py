@@ -94,7 +94,7 @@ class AWS(object):
         images = []
         for account in AwsAccount.objects.all():
             c = self.__updategroups(account)
-            amis = c.get_all_images(owners = [account.account_number])
+            amis = c.get_all_images(owners = [account.id])
             for ami in amis:
                 image, created = self.update(ami,account)
                 if image:
@@ -105,7 +105,7 @@ class AWS(object):
             amis = c.get_all_images()
             for ami in amis:
                 try:
-                    AwsAccount.objects.get(account_number = ami.ownerId)
+                    AwsAccount.objects.get(id = ami.ownerId)
                     continue
                 except:
                     image, created = self.update(ami)
@@ -123,7 +123,7 @@ class AWS(object):
 
 
 def updateReservation(res):
-    account = AwsAccount.objects.get(account_number = res.owner_id)
+    account = AwsAccount.objects.get(id = res.owner_id)
     reg     = res.region.name
     groups  = []
     instances = []

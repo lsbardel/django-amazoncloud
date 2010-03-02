@@ -21,14 +21,8 @@ def confirmation(modeladmin, request, queryset, action, question):
     # Check that the user has delete permission for the actual model
     if not modeladmin.has_delete_permission(request):
         raise PermissionDenied
-    
-    # Populate deletable_objects, a data structure of all related objects that
-    # will also be deleted.
-    deletable_objects, perms_needed = get_deleted_objects(queryset, opts, request.user, modeladmin.admin_site, levels_to_root=2)
-        
+          
     if request.POST.get('post'):
-        if perms_needed:
-            raise PermissionDenied
         instance_command(action,queryset)
         return None
 
@@ -37,9 +31,7 @@ def confirmation(modeladmin, request, queryset, action, question):
                 "question": question,
                 "title": _("Are you sure?"),
                 "object_name": force_unicode(opts.verbose_name),
-                "deletable_objects": deletable_objects,
                 'queryset': queryset,
-                "perms_lacking": perms_needed,
                 "opts": opts,
                 "root_path": modeladmin.admin_site.root_path,
                 "app_label": app_label,
