@@ -4,6 +4,7 @@ from django.db import models
 from django.utils.translation import ugettext_lazy as _
 
 from amazoncloud.core import installers
+from amazoncloud.settings import EBS_COST_GB_MONTH
 
 
 def s3(account):
@@ -143,6 +144,16 @@ class AMI(EC2base):
     def __unicode__(self):
         return u'Image: %s' % self.id
     
+    def cost(self):
+        '''
+        Estimated cost/month
+        '''
+        if self.our and self.root_device_type == 1:
+            return EBS_COST_GB_MONTH*self.size
+        else:
+            return 0
+    cost.short_description = 'cost ($)'
+    
     def boto(self):
         '''
         Return a boto Image object coreespoinding to the model instance
@@ -205,6 +216,13 @@ class Instance(EC2base):
     def security(self):
         return ', '.join(self.sgroup())
     security.short_description = 'security groups'
+    
+    def cost(self):
+        '''
+        Estimated cost/month
+        '''
+        return 0
+    cost.short_description = 'cost ($)'
     
 
 class IpAddress(EC2base):

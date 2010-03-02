@@ -46,7 +46,7 @@ class KeyPairAdmin(EC2Admin):
      
     
 class AMIAdmin(EC2Admin):
-    list_display = ('id','name','region','size','root_device_type','accno','our',
+    list_display = ('id','name','region','size','root_device_type','accno','cost','our',
                     'is_public','platform','architecture','location','timestamp')
     list_filter = ('is_public', 'root_device_type', 'architecture', 'region', 'our')
     search_fields  = ('name', 'description', 'architecture')

@@ -78,7 +78,7 @@ def launch_instance(modeladmin, request, queryset):
         ami = queryset[0]
         url = '{0}amazoncloud/instance/add/?ami={1}&size={2}'.format(settings.ADMIN_URL_PREFIX,
                                                                      ami.pk,
-                                                                     int(ami.size))
+                                                                     ami.size)
         return http.HttpResponseRedirect(url)
     else:
         messages.error(request, "Select on image at a time when launching new instances.")
@@ -96,11 +96,12 @@ def terminate_instances(modeladmin, request, queryset):
                      "Are you sure you want to terminate the selected instances?")
 
 def reboot_instances(modeladmin, request, queryset):
-    c = confirmation(modeladmin, request, queryset,'reboot_instances'
+    return confirmation(modeladmin, request, queryset,'reboot_instances'
                      "Are you sure you want to reboot the selected instances?")
 
 def stop_instances(modeladmin, request, queryset):
-    instance_command('stop_instances',queryset)
+    return confirmation(modeladmin, request, queryset,'stop_instances'
+                     "Are you sure you want to stop the selected instances?")
 
 def monitor_instances(modeladmin, request, queryset):
     instance_command('monitor_instance',queryset)

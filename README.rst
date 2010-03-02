@@ -40,9 +40,11 @@ The application stores your account's private AMI as well as public AMI
 
 Instances
 ---------------
- * Full management of your instances: start, stop, reboot, terminate.
- * You can also create a new AMI from a running instance, implemented as an action in the Instances list.
- * **Image Resizing** If the type of instance is mounted on EBS, you can specify a different image size. in this way you can create new EBS images of different sizes.
+Full management of your instances: start, stop, reboot, terminate. Create a new AMI from a running instance,
+implemented as an action in the Instances list.
+
+ If the running image is mounted on EBS, 
+**Image Resizing**. If the type of instance is mounted on EBS, you can specify a different image size. In this way you can create new EBS images of different sizes.
 
 Security
 -----------
@@ -51,6 +53,7 @@ Security
 
 Todo
 ============
+ * Allow change of instance IP address
  * S3
  
 
