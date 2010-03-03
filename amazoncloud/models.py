@@ -156,6 +156,10 @@ class KeyPair(EC2base):
 
 
 class SnapShot(PublicEC2):
+    '''
+    Snapshots are tied to Regions and can only be used
+    for volumes within the same Region
+    '''
     state       = models.CharField(max_length = 32, editable = False)
     timestamp   = models.DateTimeField(editable = False, null = True, verbose_name = _('created'))
     description = models.CharField(max_length = 255)
@@ -226,6 +230,13 @@ class EbsVolume(PrivateEC2):
     def _calc_cost(self):
         return self.size * awsettings.EBS_COST_GB_MONTH
     
+    def instance(self):
+        insts = self.instances.all()
+        if insts:
+            return insts[0]
+        else:
+            return None
+    
     
 class Instance(PrivateEC2):
     '''
@@ -240,12 +251,13 @@ class Instance(PrivateEC2):
     private_dns_name    = models.CharField(max_length = 500, editable = False, blank = True)
     public_dns_name     = models.CharField(max_length = 500, editable = False, blank = True)
     ip_address          = models.CharField(max_length = 32, blank = True)
-    persistent          = models.BooleanField(default = False)
+    persistent          = models.BooleanField(default = False,
+                                              help_text = _('If ticked the volume will persist after image termination'))
     monitored           = models.BooleanField(default = False)
     region              = models.CharField(max_length = 255, blank = True)
     key_pair            = models.ForeignKey(KeyPair)
     security_groups     = models.ManyToManyField(SecurityGroup, null = True)
-    volume              = models.ForeignKey(EbsVolume, null = True, related_name = 'instances')
+    volume              = models.ForeignKey(EbsVolume, null = True, related_name = 'instances', editable = False)
     
     def __unicode__(self):
         return u'Instance: %s' % self.id

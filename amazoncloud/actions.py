@@ -46,22 +46,23 @@ def confirmation(modeladmin, request, queryset, action, question):
     
 
 
-def instance_command(command, queryset):
+def instance_command(command, queryset, group = True):
     '''
     stop, reboot, terminate, monitor/unmonitor commands on instances
     '''
     for obj in queryset:
+        id   = obj.id
         inst = obj.instance()
         conn = inst.connection
         comm = getattr(conn,command,None)
         if comm:
-            r = comm([obj.id])
-            if r:
-                inst = r[0]
-                inst.update()
-                obj.state = inst.state
-                obj.monitored = inst.monitored
-                obj.save()
+            if group:
+                id = [id]
+            r = comm(id)
+            inst.update()
+            obj.state = inst.state
+            obj.monitored = inst.monitored
+            obj.save()
 
 
 #________________________________________________________ Actions on Images
@@ -88,18 +89,18 @@ def terminate_instances(modeladmin, request, queryset):
                      "Are you sure you want to terminate the selected instances?")
 
 def reboot_instances(modeladmin, request, queryset):
-    return confirmation(modeladmin, request, queryset,'reboot_instances'
+    return confirmation(modeladmin, request, queryset,'reboot_instances',
                      "Are you sure you want to reboot the selected instances?")
 
 def stop_instances(modeladmin, request, queryset):
-    return confirmation(modeladmin, request, queryset,'stop_instances'
+    return confirmation(modeladmin, request, queryset,'stop_instances',
                      "Are you sure you want to stop the selected instances?")
 
 def monitor_instances(modeladmin, request, queryset):
-    instance_command('monitor_instance',queryset)
+    instance_command('monitor_instance',queryset,group=False)
     
 def unmonitor_instances(modeladmin, request, queryset):
-    instance_command('unmonitor_instance',queryset)
+    instance_command('unmonitor_instance',queryset,group=False)
 
 def create_image(modeladmin, request, queryset):
     if queryset.count() == 1:

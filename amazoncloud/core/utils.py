@@ -216,7 +216,6 @@ class AWS(object):
                                                           ami = ami,
                                                           key_pair = key)
             ain.timestamp = dt
-            ain.persistent = inst.persistent
             ain.region = reg
             ain.state = inst.state
             ain.type  = inst.instance_type
@@ -229,13 +228,14 @@ class AWS(object):
                 ebsblock   = inst.block_device_mapping[inst.root_device_name]
                 ain.volume = EbsVolume.objects.get(id = ebsblock.volume_id)
                 ain.size   = ain.volume.size
+                ain.persistent = not ebsblock.delete_on_termination
             except:
                 pass
         
             ain.security_groups.clear()
             for g in groups:
                 ain.security_groups.add(g)
-                ain.save()
+            ain.save()
             self.instances.append(ain.id)
 
     def clear(self, all = False):
@@ -243,7 +243,7 @@ class AWS(object):
         IpAddress.objects.exclude(pk__in = self.ips).delete()
         SecurityGroup.objects.exclude(pk__in=self.groups).delete()
         KeyPair.objects.exclude(pk__in=self.keys).delete()
-        EbsVolume.objects.exclude(ph__in = self.vols).delete()
+        EbsVolume.objects.exclude(pk__in = self.vols).delete()
         if all:
             SnapShot.objects.exclude(pk__in = self.snaps).delete()
             AMI.objects.exclude(pk__in = self.amis).delete()

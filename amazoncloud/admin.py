@@ -85,7 +85,7 @@ class AMIAdmin(EC2Admin):
 class InstanceAdmin(EC2Admin):
     list_display = ('id','account','ami','root','size','state','timestamp','type',
                     'region','public_dns_name',
-                    'ip_address','key_pair','security','volume','monitored')
+                    'ip_address','key_pair','security','volume','persistent','monitored')
     form = forms.InstanceForm
     actions = [actions.terminate_instances,
                actions.reboot_instances,
@@ -107,6 +107,7 @@ class InstanceAdmin(EC2Admin):
         if image.root_device_type == 'ebs':
             rdn = image.root_device_name
             ebsblock = image.block_device_mapping[image.root_device_name]
+            ebsblock.delete_on_termination = not obj.persistent
             if obj.size > 0:
                 ebsblock.size = obj.size
         sgn = [s.name for s in form.cleaned_data['security_groups']]
@@ -116,17 +117,18 @@ class InstanceAdmin(EC2Admin):
                               instance_type=obj.type,
                               monitoring_enabled=obj.monitored,
                               block_device_map = image.block_device_mapping)
-        utils.updateReservation(res)
+        aws = utils.AWS()
+        aws.updateReservation(res)
 
 class SnapShotAdmin(EC2Admin):
-    list_display=['id', 'accno', 'size', 'state', 'timestamp', 'our']
+    list_display=['id', 'accno', 'size', 'state', 'timestamp', 'our', 'cost']
     list_filter = ('state', 'our')
             
 class VolumeAdmin(EC2Admin):
-    list_display=['id', 'account', 'size', 'region', 'state', 'snapshot']
+    list_display=['id', 'account', 'size', 'region', 'state', 'instance', 'snapshot', 'cost']
 
 class IpAddressAdmin(admin.ModelAdmin):
-    list_display=['account','ip','instance']
+    list_display=['account','ip','instance','cost']
     form = forms.CreateAddress
     
     def save_model(self, request, obj, form, change):
