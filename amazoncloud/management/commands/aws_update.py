@@ -16,6 +16,6 @@ class Command(BaseCommand):
         '''
         from amazoncloud.core import utils
         aws = utils.AWS()
-        aws.sync_accounts()
-        aws(all = False)
-        utils.updateInstances()
+        aws.sync_private()
+        #aws(all = False)
+        #utils.updateInstances()

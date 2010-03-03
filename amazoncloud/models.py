@@ -4,7 +4,7 @@ from django.db import models
 from django.utils.translation import ugettext_lazy as _
 
 from amazoncloud.core import installers
-from amazoncloud.settings import EBS_COST_GB_MONTH
+from amazoncloud import settings as awsettings
 
 
 def s3(account):
@@ -27,6 +27,10 @@ rdtypes = ((0, 'unknown'),
            (2, 'instance-store')
            )
 rddict = dict(rdtypes)
+
+valume_status = (('available','available'),
+                 ('in-use','in use')
+                 )
 
 archtype = (('i386','i386'),
             ('x86_64','x86_64')
@@ -64,6 +68,7 @@ class AwsAccount(models.Model):
         '''
         return self.ec2().allocate_address()
 
+#_________________________________________ ABSTRACT BASE MODELS
 
 class EC2base(models.Model):    
     class Meta:
@@ -71,6 +76,41 @@ class EC2base(models.Model):
         
     def ec2(self):
         return ec2(self.account)
+    
+    def cost(self):
+        return self._calc_cost()
+    cost.short_description = 'cost ($/month)'
+    
+    def _calc_cost(self):
+        return 0
+    
+
+class PublicEC2(EC2base):
+    id               = models.CharField(primary_key = True, max_length = 255, editable = False)
+    account          = models.ForeignKey(AwsAccount, null = True, blank = True)
+    owner_id         = models.CharField(max_length = 255)
+    is_public        = models.BooleanField(default = False)
+    size             = models.PositiveIntegerField(default = 0)
+    our              = models.BooleanField(default = False, editable = False)
+    
+    class Meta:
+        abstract = True
+        
+    def accno(self):
+        if self.account:
+            return self.account
+        else:
+            return self.owner_id
+    accno.short_description = "account"
+
+class PrivateEC2(EC2base):
+    id               = models.CharField(primary_key = True, max_length = 255, editable = False)
+    account          = models.ForeignKey(AwsAccount)
+    
+    class Meta:
+        abstract = True
+
+    
 
     
 class SecurityGroup(EC2base):
@@ -114,28 +154,33 @@ class KeyPair(EC2base):
             os.chmod(path, stat.S_IRUSR)
 
 
-class AMI(EC2base):
+
+class SnapShot(PublicEC2):
+    state       = models.CharField(max_length = 32, editable = False)
+    timestamp   = models.DateTimeField(editable = False, null = True, verbose_name = _('created'))
+    description = models.CharField(max_length = 255)
+    
+    def __unicode__(self):
+        return u'Snapshot: %s' % self.id
+    
+
+class AMI(PublicEC2):
     '''
     Amazon Machine Image - slightly denormalized
     '''
-    id               = models.CharField(primary_key = True, max_length = 255, editable = False)
     timestamp        = models.DateTimeField(auto_now_add = True, editable = False)
     name             = models.CharField(max_length = 255)
-    description      = models.TextField(blank = True)
+    description      = models.CharField(max_length = 255)
     root_device_type = models.PositiveIntegerField(choices = rdtypes,
                                                    verbose_name = 'Root Device Type')
     location         = models.CharField(max_length = 255)
     root_device_name = models.CharField(max_length = 255)
-    account          = models.ForeignKey(AwsAccount, null = True, blank = True)
-    owner_id         = models.CharField(max_length = 255)
     platform         = models.CharField(choices = supported_os, max_length = 255, blank = True)
     architecture     = models.CharField(choices = archtype, max_length = 255)
-    is_public        = models.BooleanField(default = False)
     kernel_id        = models.CharField(max_length = 255)
     region           = models.CharField(max_length = 64)
-    snapshot_id      = models.CharField(max_length = 64)
-    size             = models.PositiveIntegerField(default = 0)
-    our              = models.BooleanField()
+    snapshot         = models.ForeignKey(SnapShot, null = True, editable = False)
+    ramdisk_id       = models.CharField(max_length = 64, editable = False)
     
     class Meta:
         verbose_name = 'AMI'
@@ -144,15 +189,13 @@ class AMI(EC2base):
     def __unicode__(self):
         return u'Image: %s' % self.id
     
-    def cost(self):
+    def _calc_cost(self):
         '''
         Estimated cost/month
+        This is just the maximum cost possible
         '''
-        if self.our and self.root_device_type == 1:
-            return EBS_COST_GB_MONTH*self.size
-        else:
-            return 0
-    cost.short_description = 'cost ($)'
+        sz = self.size or 10
+        return awsettings.S3_COST_GB_MONTH*sz
     
     def boto(self):
         '''
@@ -165,33 +208,44 @@ class AMI(EC2base):
     def run(self):
         image       = self.image()
         reservation = self
-        
-    def accno(self):
-        if self.account:
-            return self.account
-        else:
-            return self.owner_id
-        
-    #def our(self):
-    #    return self.account is not None
-    #our.boolean = True
+    
+
+class EbsVolume(PrivateEC2):
+    '''
+    Amazon Elastic Block Store, slightly denormalized 
+    '''
+    timestamp   = models.DateTimeField(editable = False, null = True, verbose_name = _('created'))
+    region      = models.CharField(max_length = 64)
+    snapshot    = models.ForeignKey(SnapShot, null = True)
+    state       = models.CharField(choices = valume_status, max_length = 32, editable = False)
+    size        = models.PositiveIntegerField()
+    
+    def __unicode__(self):
+        return u'Volume: %s' % self.id
+    
+    def _calc_cost(self):
+        return self.size * awsettings.EBS_COST_GB_MONTH
     
     
-class Instance(EC2base):
-    id      = models.CharField(primary_key = True, max_length = 255, editable = False)
-    account = models.ForeignKey(AwsAccount)
-    ami     = models.ForeignKey(AMI)
-    state   = models.CharField(max_length = 255, editable = False)
-    timestamp = models.DateTimeField(editable = False, null = True, verbose_name = _('started'))
-    type   = models.CharField(choices = instype, max_length = 255)
-    size    = models.PositiveIntegerField(default = 0)
-    private_dns_name = models.CharField(max_length = 500, editable = False, blank = True)
-    public_dns_name = models.CharField(max_length = 500, editable = False, blank = True)
-    ip_address = models.CharField(max_length = 32, blank = True)
-    monitored = models.BooleanField(default = False)
-    region    = models.CharField(max_length = 255, blank = True)
-    key_pair  = models.ForeignKey(KeyPair)
-    security_groups = models.ManyToManyField(SecurityGroup, null = True)
+class Instance(PrivateEC2):
+    '''
+    Amazon Instance. Slightly denormalized
+        Can be booted from S3 or EBS
+    '''
+    ami                 = models.ForeignKey(AMI)
+    state               = models.CharField(max_length = 255, editable = False)
+    timestamp           = models.DateTimeField(editable = False, null = True, verbose_name = _('started'))
+    type                = models.CharField(choices = instype, max_length = 255)
+    size                = models.PositiveIntegerField(default = 0)
+    private_dns_name    = models.CharField(max_length = 500, editable = False, blank = True)
+    public_dns_name     = models.CharField(max_length = 500, editable = False, blank = True)
+    ip_address          = models.CharField(max_length = 32, blank = True)
+    persistent          = models.BooleanField(default = False)
+    monitored           = models.BooleanField(default = False)
+    region              = models.CharField(max_length = 255, blank = True)
+    key_pair            = models.ForeignKey(KeyPair)
+    security_groups     = models.ManyToManyField(SecurityGroup, null = True)
+    volume              = models.ForeignKey(EbsVolume, null = True, related_name = 'instances')
     
     def __unicode__(self):
         return u'Instance: %s' % self.id
@@ -217,18 +271,26 @@ class Instance(EC2base):
         return ', '.join(self.sgroup())
     security.short_description = 'security groups'
     
-    def cost(self):
+    def _calc_cost(self):
         '''
         Estimated cost/month
         '''
-        return 0
-    cost.short_description = 'cost ($)'
+        mc = 0
+        if self.monitored:
+            mc = awsettings.COST_CLOUD_WATCH_HOUR*24*365/30.0
+        return mc
     
 
 class IpAddress(EC2base):
     account = models.ForeignKey(AwsAccount)
     ip = models.IPAddressField(unique = True)
-    instance = models.ForeignKey(Instance, null = True)    
+    instance = models.ForeignKey(Instance, null = True)
+    
+    def _calc_cost(self):
+        if self.instance:
+            return 0
+        else:
+            return  awsettings.IP_COST_HOUR*24*365/30.0
 
     
 class Installer(models.Model):

@@ -47,7 +47,7 @@ class KeyPairAdmin(EC2Admin):
     
 class AMIAdmin(EC2Admin):
     list_display = ('id','name','region','size','root_device_type','accno','cost','our',
-                    'is_public','platform','architecture','location','timestamp')
+                    'is_public','platform','architecture','location','timestamp','snapshot')
     list_filter = ('is_public', 'root_device_type', 'architecture', 'region', 'our')
     search_fields  = ('name', 'description', 'architecture')
     form    = forms.CreateImage
@@ -83,8 +83,9 @@ class AMIAdmin(EC2Admin):
 
     
 class InstanceAdmin(EC2Admin):
-    list_display = ('id','account','ami','root','size','state','timestamp','type','region','public_dns_name',
-                    'ip_address','key_pair','security','monitored')
+    list_display = ('id','account','ami','root','size','state','timestamp','type',
+                    'region','public_dns_name',
+                    'ip_address','key_pair','security','volume','monitored')
     form = forms.InstanceForm
     actions = [actions.terminate_instances,
                actions.reboot_instances,
@@ -116,7 +117,13 @@ class InstanceAdmin(EC2Admin):
                               monitoring_enabled=obj.monitored,
                               block_device_map = image.block_device_mapping)
         utils.updateReservation(res)
-        
+
+class SnapShotAdmin(EC2Admin):
+    list_display=['id', 'accno', 'size', 'state', 'timestamp', 'our']
+    list_filter = ('state', 'our')
+            
+class VolumeAdmin(EC2Admin):
+    list_display=['id', 'account', 'size', 'region', 'state', 'snapshot']
 
 class IpAddressAdmin(admin.ModelAdmin):
     list_display=['account','ip','instance']
@@ -140,4 +147,6 @@ admin.site.register(models.AwsAccount, AwsAccountAdmin)
 admin.site.register(models.SecurityGroup, list_display=['account','name'])
 admin.site.register(models.KeyPair,KeyPairAdmin)
 admin.site.register(models.Installer, list_display=['name','osystem'])
+admin.site.register(models.EbsVolume, VolumeAdmin)
+admin.site.register(models.SnapShot, SnapShotAdmin)
 admin.site.register(models.IpAddress, IpAddressAdmin)
